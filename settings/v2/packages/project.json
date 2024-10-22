@@ -1,0 +1,45 @@
+{
+  "general": {
+    "designResolution": {
+      "width": 750,
+      "height": 1334,
+      "fitHeight": false,
+      "fitWidth": true
+    }
+  },
+  "physics": {
+    "collisionGroups": [
+      {
+        "index": 1,
+        "name": "player"
+      },
+      {
+        "index": 2,
+        "name": "trap"
+      },
+      {
+        "index": 3,
+        "name": "water"
+      },
+      {
+        "index": 4,
+        "name": "brick"
+      },
+      {
+        "index": 5,
+        "name": "enemy"
+      }
+    ],
+    "collisionMatrix": {
+      "0": 54,
+      "1": 63,
+      "2": 55,
+      "3": 34,
+      "4": 39,
+      "5": 31
+    },
+    "gravity": {
+      "y": -20
+    }
+  }
+}

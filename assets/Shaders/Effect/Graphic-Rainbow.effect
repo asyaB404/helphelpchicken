@@ -1,0 +1,79 @@
+// Effect Syntax Guide: https://github.com/cocos-creator/docs-3d/blob/master/zh/material-system/effect-syntax.md
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: vs:vert
+      frag: fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: one
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: one
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+}%
+
+CCProgram vs %{
+  precision highp float;
+
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+
+  in vec4 a_color;
+  out vec4 v_color;
+
+  in float a_dist;
+  out float v_dist;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    pos = cc_matViewProj * cc_matWorld * pos;
+
+    v_color = a_color;
+    v_dist = a_dist;
+
+    return pos;
+  }
+}%
+
+CCProgram fs %{
+
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec4 v_color;
+  in float v_dist;
+  vec3 Pallete(float t) {
+    // 动起来
+    t += cc_time.x;
+
+    vec3 dcOffset = vec3(0.5, 0.5, 0.5);
+    vec3 freq = vec3(1., 1., 1.);
+    vec3 phase = vec3(0., 0.3333, 0.6666);
+    return dcOffset + cos(2. * 3.14159 * (freq * t + phase));
+  }
+
+
+  vec4 frag () {
+    vec4 o = v_color;
+
+    float aa = 0.05;
+
+    float alpha = smoothstep(aa, -aa, abs(v_dist) - 1.0);
+
+    float D = v_dist * 0.5 + 0.5;
+    
+    o.rgb = Pallete(D);
+    o.rgb *= alpha;
+
+    return o;
+  }
+}%

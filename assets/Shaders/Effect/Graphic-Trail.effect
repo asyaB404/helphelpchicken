@@ -1,0 +1,80 @@
+// Effect Syntax Guide: https://github.com/cocos-creator/docs-3d/blob/master/zh/material-system/effect-syntax.md
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: vs:vert
+      frag: fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: one
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: one
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      properties:
+        mainTexture: { value: white, inspector: { displayName: 'Texture' } }
+        size: { value: [15.0, 20.0, 0.666667, 0.05], inspector: { displayName: 'size', tooltip: '(单位px)长、宽、1/长、1/宽'} } 
+        uv_shift: { value: [0., 0.], inspector: { displayName: 'UvTime', tooltip: '每秒偏移量'} } 
+}%
+
+CCProgram vs %{
+  precision highp float;
+
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  
+  in float a_dist;
+  out float v_dist;
+  
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+
+    pos = cc_matViewProj * cc_matWorld * pos;
+ 
+    v_dist = a_dist;
+
+    return pos;
+  }
+}%
+
+CCProgram fs %{
+  #if CC_SUPPORT_standard_derivatives
+    #extension GL_OES_standard_derivatives : enable
+  #endif
+
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in float v_dist;
+  uniform sampler2D mainTexture;
+
+  uniform Constants {
+    vec4 size;
+    vec4 runtime_color;
+    vec2 uv_shift;
+  };
+
+
+  vec4 frag () {
+
+    float aa = 0.05;
+
+    float alpha = smoothstep(aa, -aa, abs(v_dist) - 1.0);
+    float D = v_dist * 0.5 + 0.5;    
+
+    vec4 color = texture(mainTexture, vec2(D, 0.5));
+  
+    color.a *= alpha;
+
+    return color;
+  }
+}%

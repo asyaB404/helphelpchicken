@@ -1,0 +1,13 @@
+{
+  "splash-setting": {
+    "url": "/Users/iwae/savemeow/assets/resources/logo.png",
+    "totalTime": 1300,
+    "displayRatio": 0.3,
+    "clearColor": {
+      "x": 0.9647058823529412,
+      "y": 0.9882352941176471,
+      "z": 0.803921568627451,
+      "w": 1
+    }
+  }
+}

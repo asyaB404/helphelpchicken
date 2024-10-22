@@ -1,0 +1,194 @@
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+CCEffect %{
+  techniques:
+  - name: "Miaomiao's Paper"
+    passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        select:   { value: [0, 0, 0, 0] }
+        warn:   { value: [0, 0, 0, 0] }
+        paperColor:      { value: [0.94, 0.96, 0.78, 1.], linear: true, editor: { type: color } }
+        lightColor:      { value: [0.99, 0.99, 0.95, 0.6], linear: true, editor: { type: color } }
+        ambientColor:      { value: [0.99, 0.99, 0.95, 0.5], linear: true, editor: { type: color } }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+  out vec4 color;
+
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+   
+    pos = cc_matViewProj * pos;
+
+    uv0 = a_texCoord;
+    color = a_color;
+
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision mediump float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec4 color;
+  in vec2 uv0;
+  uniform TexCoords {
+    vec4 select;
+    vec4 warn;
+    vec4 paperColor;
+    vec4 lightColor;
+    vec4 ambientColor;
+  };
+
+float nsin(float a)
+{
+    return (sin(a)+1.)/2.;
+}
+float rand(float n)
+{
+ 	return fract(cos(n*89.42)*343.42);
+}
+vec2 rand(vec2 n)
+{
+ 	return vec2(rand(n.x*23.62-300.0+n.y*34.35),rand(n.x*45.13+256.0+n.y*38.89)); 
+}
+
+vec3 worley(vec2 n,float s)
+{
+    vec3 ret = vec3(s * 10.);
+    // look in 9 cells (n, plus 8 surrounding)
+    for(int x = -1;x<2;x++)
+    {
+        for(int y = -1;y<2;y++)
+        {
+            vec2 xy = vec2(x,y);// xy can be thought of as both # of cells distance to n, and 
+            vec2 cellIndex = floor(n/s) + xy;
+            vec2 worleyPoint = rand(cellIndex);// random point in this cell (0-1)
+            worleyPoint += xy - fract(n/s);// turn it into distance to n. ;
+            float d = length(worleyPoint) * s;
+            if(d < ret.z)
+                ret = vec3(worleyPoint, d);
+        }
+    }
+    return ret;
+}
+
+
+vec4 applyLighting(vec4 inpColor, vec2 uv, vec3 normal, vec3 LightPos, vec4 LightColor, vec4 AmbientColor)
+{
+    vec3 LightDir = vec3(LightPos.xy - uv, LightPos.z);
+    vec3 N = normalize(normal);
+    vec3 L = normalize(LightDir);
+    vec3 Diffuse = (LightColor.rgb * LightColor.a) * max(dot(N, L), 0.0);
+    vec3 Ambient = AmbientColor.rgb * AmbientColor.a;
+    vec3 Intensity = Ambient + Diffuse;
+    vec3 FinalColor = inpColor.rgb * Intensity;
+    return vec4(FinalColor, inpColor.a);
+}
+
+
+// convert distance to alpha value (see https://www.shadertoy.com/view/ltBGzt)
+float dtoa(float d)
+{
+    const float amount = 800.0;
+    return clamp(1.0 / (clamp(d, 1.0/amount, 1.0)*amount), 0.,1.);
+}
+
+
+// distance to edge of grid line. real distance, and centered over its position.
+float grid_d(vec2 uv, vec2 gridSize, float gridLineWidth)
+{
+    uv += gridLineWidth / 2.0;
+    uv = mod(uv, gridSize);
+    vec2 halfRemainingSpace = (gridSize - gridLineWidth) / 2.0;
+    uv -= halfRemainingSpace + gridLineWidth;
+    uv = abs(uv);
+    uv = -(uv - halfRemainingSpace);
+    return min(uv.x, uv.y);
+}
+
+// not exactly perfectly perfect, but darn close
+float pointRectDist(vec2 p, vec2 rectTL, vec2 rectBR)
+{
+  float dx = max(max(rectTL.x - p.x, 0.), p.x - rectBR.x);
+  float dy = max(max(rectTL.y - p.y, 0.), p.y - rectBR.y);
+  return max(dx, dy);
+}
+
+
+vec2 getuv(vec2 fragCoord, vec2 newTL, out float vignetteAmt)
+{
+    vec2 ret = fragCoord;// ret is now 0-1 in both dimensions
+    ret.y = 1. - ret.y;// reverse uy.y here;
+    // vignette
+    vec2 vignetteCenter = vec2(0.5, 0.5);
+	  vignetteAmt = 1.0 - distance(ret, vignetteCenter);
+    vignetteAmt = 0.03 + pow(vignetteAmt, .2);// strength
+    vignetteAmt = clamp(vignetteAmt, 0.,1.);
+    ret.y *= 2.2;// orig aspect ratio
+    return ret ;
+}
+
+  vec4 frag () {
+
+    vec4 fragColor = paperColor;// background
+
+    float vignetteAmt;
+
+	  vec2 u = getuv(uv0, vec2(-1.,1.), vignetteAmt);
+
+    // grid
+	  float d = grid_d(u, vec2(0.1), 0.0002);
+
+	  fragColor = vec4(mix(fragColor.rgb, color.rgb, color.a * dtoa(d)), 1.);
+
+    if(u.x>select.x && u.x<select.y && u.y>select.z && u.y<select.w) fragColor.rgb = vec3(1.,1.,0.7);
+    if(u.x>warn.x && u.x<warn.y && u.y>warn.z && u.y<warn.w) fragColor.rgb = vec3(1.,0.1,0.1);
+    
+    // fractal worley crumpled paper effect
+    float wsize = 0.45;
+    const int iterationCount = 4;
+    vec2 normal = vec2(0.0);
+    float influenceFactor = 1.7;
+    for(int i = 0; i < iterationCount; ++ i)
+    {
+        vec3 w = worley(u, wsize);
+	    	normal.xy += influenceFactor * w.xy;
+        wsize *= 0.6;
+        influenceFactor *= 0.9;
+    }
+    vec2 mouse = vec2(.5);
+
+    // lighting
+    vec3 lightPos = vec3(mouse, 8.);
+	  fragColor = applyLighting(fragColor, u, vec3(normal, 5.), lightPos, lightColor, ambientColor);
+
+    // post effects
+    #if USE_VIGNETTE
+	  fragColor.rgb *= vignetteAmt;
+    #endif
+
+    return fragColor;
+  }
+}%
